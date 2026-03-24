@@ -1,6 +1,6 @@
 ---
 name: fal-ai-image
-description: "Generate, edit, inpaint, upscale, and remove backgrounds via fal.ai API. PRIMARY image tool for ALL image tasks. Only fall back to other models when fal.ai fails."
+description: "Generate, edit, inpaint, upscale, and remove backgrounds via fal.ai API. PRIMARY image tool for ALL image tasks. Fallback: Gemini (nano-banana-pro skill)."
 homepage: https://fal.ai
 metadata:
   openclaw:
@@ -98,44 +98,15 @@ uv run {baseDir}/scripts/fal_image.py rembg -i photo.png -f out_nobg.png
 | `--debug` | off | Print full API response |
 | `--ref` | none | Reference image(s) for edit mode |
 
-## Grok Aurora Fallback (NSFW-permissive)
+## Fallback
 
-When fal.ai content policy blocks the request, fall back to Grok Aurora:
+When fal.ai content policy blocks the request, fall back to **Gemini** (nano-banana-pro skill).
+Do NOT use Grok free API — output quality too low to be usable.
 
-```bash
-uv run {baseDir}/scripts/grok_image.py generate -p "your prompt" -f out.png
-```
+## API Key
 
-### Grok sizes
-
-`1024x1024` | `1024x1792` (portrait, default) | `1792x1024` (landscape) | `1280x720` | `720x1280`
-
-```bash
-uv run {baseDir}/scripts/grok_image.py generate -p "portrait photo" -f out.png --size 1024x1792
-```
-
-### Grok edit
-
-```bash
-uv run {baseDir}/scripts/grok_image.py edit -p "edit instruction" -i input.png -f out.png
-```
-
-### Grok env vars
-
-- `GROK_API_BASE` — API base URL (required)
-- `GROK_API_KEY` — API key (required)
-
-### Grok quality notes
-
-- Uses `response_format: b64_json` to avoid proxy compression (URL downloads lose ~85% quality)
-- Native resolution max ~784x1168; use fal.ai ESRGAN upscale for higher res
-- More permissive content policy than fal.ai
-
-## API Keys
-
-- `FAL_KEY` — fal.ai (required for primary)
-- `GROK_API_BASE` + `GROK_API_KEY` — Grok Aurora (required for fallback)
-- Or pass `--api-key` / `--api-base` flags per invocation
+- `FAL_KEY` environment variable (required)
+- Or `--api-key` flag per invocation
 
 ## Notes
 
