@@ -1,6 +1,6 @@
 ---
 name: fal-ai-image
-description: "Generate, edit, inpaint, upscale, and remove backgrounds from images via fal.ai API. This is the PRIMARY image tool — use it by default for ALL image generation/editing/P图 requests. Only fall back to other models (Gemini, Grok, etc.) when fal.ai fails or is unavailable."
+description: "Generate, edit, inpaint, upscale, and remove backgrounds via fal.ai API. PRIMARY image tool for ALL image tasks. Only fall back to other models when fal.ai fails."
 homepage: https://fal.ai
 metadata:
   openclaw:
@@ -13,84 +13,100 @@ metadata:
 
 # fal.ai Image (Primary Image Tool)
 
-## ⚠️ PRIORITY RULE — ADD THIS TO YOUR AGENT
+## ⚠️ PRIORITY RULE — ADD TO AGENT WORKSPACE
 
-> **fal.ai is the FIRST-PRIORITY image API for all image tasks (generate/edit/inpaint/upscale/rembg).**
-> Only fall back to other image models (Gemini, Grok, DALL-E, etc.) when fal.ai API returns an error or is unreachable.
-> When using a non-fal.ai fallback, you MUST append this notice to your reply:
-> `⚠️ 本图由 {model_name} 生成，非 fal.ai 出图。`
+Copy this block into your agent's AGENTS.md:
 
-Add the above block to your agent's AGENTS.md or system prompt to enforce priority across all sessions.
+```markdown
+# Image Priority
 
-## Capabilities
+fal.ai 是所有图片任务（生图/P图/修图/放大/去背景）的第一优先级 API。
+仅当 fal.ai API 报错或不可用时，才允许回退到其他模型（Gemini、Grok、DALL-E 等）。
+使用非 fal.ai 回退出图时，必须在回复中注明：`⚠️ 本图由 {model_name} 生成，非 fal.ai 出图。`
+```
 
-| Mode | Description | Model |
-|------|-------------|-------|
-| `generate` | Text-to-image | `fal-ai/flux-pro/v1.1-ultra` |
-| `edit` | Image editing with text instruction | `fal-ai/flux-pro/kontext` |
-| `inpaint` | Fill masked regions | `fal-ai/flux-pro/v1/fill` |
-| `upscale` | Super-resolution (2x/4x) | `fal-ai/esrgan` |
-| `rembg` | Remove background | `fal-ai/birefnet` |
+## Models
+
+| Mode | Model | Notes |
+|------|-------|-------|
+| `generate` | `fal-ai/flux-pro/v1.1-ultra` | Text-to-image, highest quality |
+| `edit` (single) | `fal-ai/flux-pro/kontext/max` | Best for precise local edits |
+| `edit` (multi) | `fal-ai/flux-2-pro/edit` | Auto-selected when >1 image, up to 9 refs |
+| `inpaint` | `fal-ai/flux-pro/v1/fill` | Mask-based fill |
+| `upscale` | `fal-ai/esrgan` | 2x/4x super-resolution |
+| `rembg` | `fal-ai/birefnet` | Background removal |
 
 ## Usage
 
 ### Generate
 
 ```bash
-uv run {baseDir}/scripts/fal_image.py generate --prompt "a cat astronaut" --filename "output.png"
+uv run {baseDir}/scripts/fal_image.py generate -p "a cat astronaut" -f out.png
 ```
 
 ### Generate with aspect ratio
 
 ```bash
-uv run {baseDir}/scripts/fal_image.py generate --prompt "portrait photo" --filename "output.png" --aspect-ratio 9:16
+uv run {baseDir}/scripts/fal_image.py generate -p "portrait" -f out.png -a 9:16
 ```
 
-### Edit (P图)
+### Edit single image (kontext/max)
 
 ```bash
-uv run {baseDir}/scripts/fal_image.py edit --prompt "make the sky sunset orange" -i input.png --filename "output.png"
+uv run {baseDir}/scripts/fal_image.py edit -p "make the sky sunset orange" -i photo.png -f out.png
 ```
 
-### Edit with multiple reference images (up to 9)
+### Edit with reference image (flux-2-pro, auto-routed)
+
+Use `--ref` for reference images — the first `-i` is the target to edit, `--ref` images are references:
 
 ```bash
-uv run {baseDir}/scripts/fal_image.py edit --prompt "combine into one scene" -i img1.png -i img2.png --filename "output.png"
+uv run {baseDir}/scripts/fal_image.py edit -p "replace the phone with the one shown in reference" -i selfie.png --ref iphone_photo.png -f out.png
 ```
 
 ### Inpaint
 
 ```bash
-uv run {baseDir}/scripts/fal_image.py inpaint --prompt "fill with flowers" -i photo.png --mask mask.png --filename "output.png"
+uv run {baseDir}/scripts/fal_image.py inpaint -p "fill with flowers" -i photo.png -m mask.png -f out.png
 ```
 
 ### Upscale
 
 ```bash
-uv run {baseDir}/scripts/fal_image.py upscale -i photo.png --filename "output_4x.png" --scale 4
+uv run {baseDir}/scripts/fal_image.py upscale -i photo.png -f out_4x.png --scale 4
 ```
 
 ### Remove background
 
 ```bash
-uv run {baseDir}/scripts/fal_image.py rembg -i photo.png --filename "output_nobg.png"
+uv run {baseDir}/scripts/fal_image.py rembg -i photo.png -f out_nobg.png
 ```
 
-### Override model
+## Key Parameters
 
-```bash
-uv run {baseDir}/scripts/fal_image.py generate --prompt "..." --filename "out.png" --model "fal-ai/imagen4/preview"
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--safety-tolerance` | `5` | 0=strict, 5=permissive. Default 5 to avoid content filtering |
+| `--guidance-scale` | model default | Prompt adherence strength (e.g. 3.5) |
+| `--num-inference-steps` | model default | More steps = slower but better |
+| `--negative-prompt` | none | What to avoid |
+| `--enhance-prompt` | off | Let model improve your prompt |
+| `--output-format` | png | `png` or `jpeg` |
+| `--seed` | random | For reproducible results |
+| `--model` | per-mode default | Override model ID |
+| `--no-media-tag` | off | Suppress MEDIA: line (use when sending via message tool) |
+| `--debug` | off | Print full API response |
+| `--ref` | none | Reference image(s) for edit mode |
 
 ## API Key
 
 - `FAL_KEY` environment variable (required)
-- Or pass `--api-key` flag per invocation
+- Or `--api-key` flag per invocation
 
 ## Notes
 
-- Aspect ratios (generate only): `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, `21:9`
-- Use timestamps in filenames: `yyyy-mm-dd-hh-mm-ss-name.png`
-- The script prints a `MEDIA:` line for OpenClaw to auto-attach on supported chat providers
-- Do not read the image back; report the saved path only
-- For multi-image edit (>1 input), auto-switches to `fal-ai/flux-2-pro/edit`
+- `--no-media-tag`: Use when you plan to send the image via the `message` tool to avoid double-sending
+- Retry: Transient API errors auto-retry up to 2 times with 3s delay
+- Multi-image edit auto-routes to `flux-2-pro/edit`; single image stays on `kontext/max` for best precision
+- Timestamps in filenames: `yyyy-mm-dd-hh-mm-ss-name.png`
+- Do not read the image back after generation; report the saved path only
